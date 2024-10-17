@@ -1,5 +1,7 @@
-async function getYesterdayWeatherData(userInput, date, APIkey) {
-    const url = `http://api.weatherapi.com/v1/history.json?key=${APIkey}&q=${userInput}&dt=${date}`; 
+const config = require('./config.js');
+
+async function getWeatherData(userInput, date, request) {
+    const url = `${config.apiUrl}${request}.json?key=${config.apiKey}&q=${userInput}&dt=${request === 'history' ? date : ''}`; 
 
     try{
         const response = await fetch(url);
@@ -16,30 +18,6 @@ async function getYesterdayWeatherData(userInput, date, APIkey) {
         return null; 
     }
 }
-
-async function getTodaysWeatherData(userInput, APIkey) {
-    const url = `http://api.weatherapi.com/v1/current.json?key=${APIkey}&q=${userInput}&aqi=no`; 
-
-    try{
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-      
-        const json = await response.json();
-        return json;
-
-    } catch (error) {
-        console.error(error.message);
-        return null; 
-    }
-}
-
-const key = 'a066f5cfd2b44572965163022241410'; 
-const yesterdayDate = getYesterdayDate(); 
-const prompt = require('prompt-sync')();
-const userInput = prompt('   Get weather data for: '); 
 
 function getYesterdayDate (){
     const date = new Date();
@@ -57,7 +35,7 @@ function getYesterdayDate (){
 }
 
 function parseData(data, yData){
-    let parsedData = {
+    const parsedData = {
         location: data.location.name,
         current: {
             temp_c: data.current.temp_c,
@@ -95,10 +73,10 @@ function checkErrorCodes(response){
     };
 }
 
-async function main(userInput, yesterdayDate, key){
+async function main(userInput, yesterdayDate){
 
-  let yData = await getYesterdayWeatherData(userInput,yesterdayDate, key);
-  let currentData = await getTodaysWeatherData (userInput, key);
+  let yData = await getWeatherData(userInput,yesterdayDate, 'history');
+  let currentData = await getWeatherData(userInput, null, 'current');
   if (yData === null || currentData === null){ 
     checkErrorCodes(yData);
     checkErrorCodes(currentData);
@@ -116,5 +94,7 @@ async function main(userInput, yesterdayDate, key){
     console.log(JSON.stringify(data));
 }
 
-
-main(userInput,yesterdayDate, key); 
+const yesterdayDate = getYesterdayDate(); 
+const prompt = require('prompt-sync')();
+const userInput = prompt('   Get weather data for: '); 
+main(userInput,yesterdayDate); 
