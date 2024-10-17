@@ -17,9 +17,6 @@ async function getYesterdayWeatherData(userInput, date, APIkey) {
     }
 }
 
-
-
-
 async function getTodaysWeatherData(userInput, APIkey) {
     const url = `http://api.weatherapi.com/v1/current.json?key=${APIkey}&q=${userInput}&aqi=no`; 
 
@@ -78,12 +75,33 @@ function parseData(data, yData){
     return parsedData;
 };
 
+function checkErrorCodes(response){
+    switch(response.status){
+        case 400:
+            console.error("Bad request, city name undefined or not found");
+            break;
+        case 401:
+            console.error("Unauthorized, invalid API key");
+            break;
+        case 403:
+            console.error("Forbidden, API key does not have permission");
+            break;
+        case 404:
+            console.error("Not found, city name not found");
+            break;
+        case 405:
+            console.error("Method not allowed, check the HTTP method");
+            break;
+    };
+}
+
 async function main(userInput, yesterdayDate, key){
 
   let yData = await getYesterdayWeatherData(userInput,yesterdayDate, key);
   let currentData = await getTodaysWeatherData (userInput, key);
   if (yData === null || currentData === null){ 
-    console.error("Bad request, city name undefined or not found");
+    checkErrorCodes(yData);
+    checkErrorCodes(currentData);
     return;
     }
     let data = parseData(currentData, yData);
