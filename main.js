@@ -1,23 +1,32 @@
 const config = require('./config.js');
 
 async function getWeatherData(userInput, date, request) {
-    const url = `${config.apiUrl}${request}.json?key=${config.apiKey}&q=${userInput}&dt=${request === 'history' ? date : ''}`; 
-
-    try{
+    const url = `${config.apiUrl}${request}.json?key=${config.apiKey}&q=${userInput}&dt=${request === 'history' ? date : ''}`;
+  
+    for (let attempt = 1; attempt <= config.retries; attempt++) {
+      try {
         const response = await fetch(url);
-
+  
         if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
+          throw new Error(`Response status: ${response.status}`);
         }
-      
+  
         const json = await response.json();
-        return json;
-
-    } catch (error) {
-        console.error(error.message);
-        return null; 
+        return json; // Retorna os dados em caso de sucesso
+  
+      } catch (error) {
+        console.warn(`Attempt ${attempt} error: ${error.message}`);
+  
+        if (attempt === config.retries) {
+          console.error(`Request failed for ${url}`);
+          return error.message; // Retorna null após todas as tentativas falharem
+        }
+  
+        // Aguarda antes da próxima tentativa
+        await new Promise(resolve => setTimeout(resolve, config.delay));
+      }
     }
-}
+  }
 
 function getYesterdayDate (){
     const date = new Date();
@@ -54,21 +63,12 @@ function parseData(data, yData){
 };
 
 function checkErrorCodes(response){
-    switch(response.status){
-        case 400:
+    switch(response.slice(-3)){
+        case "400":
             console.error("Bad request, city name undefined or not found");
             break;
-        case 401:
+        case "401":
             console.error("Unauthorized, invalid API key");
-            break;
-        case 403:
-            console.error("Forbidden, API key does not have permission");
-            break;
-        case 404:
-            console.error("Not found, city name not found");
-            break;
-        case 405:
-            console.error("Method not allowed, check the HTTP method");
             break;
     };
 }
@@ -77,24 +77,29 @@ async function main(userInput, yesterdayDate){
 
   let yData = await getWeatherData(userInput,yesterdayDate, 'history');
   let currentData = await getWeatherData(userInput, null, 'current');
-  if (yData === null || currentData === null){ 
+
+  if (typeof(yData) !== "object" || typeof(currentData) !== "object"){ 
     checkErrorCodes(yData);
     checkErrorCodes(currentData);
     return;
     }
+
     let data = parseData(currentData, yData);
-
+    
     console.log(`
-    Current Weather data for ${data.location}, (diference from yesterday)
+    Current Weather today for ${data.location}, (diference from yesterday)
 
-    Temperature: ${data.current.temp_c}°C (${data.diff.temp_c > 0 ? '+' : ''}${data.diff.temp_c}), ${data.current.temp_f}°F (${data.diff.temp_f > 0 ? '+' : ''}${data.diff.temp_f})
+    Temperature: ${data.current.temp_c}°C (${data.diff.temp_c > 0 ? '+' : ''}${data.diff.temp_c}) | ${data.current.temp_f}°F (${data.diff.temp_f > 0 ? '+' : ''}${data.diff.temp_f})
     umidity: ${data.current.humidity} (${data.diff.humidity > 0 ? '+' : ''}${data.diff.humidity})
     Wind Speed: ${data.current.wind_kph} km/h (${data.diff.wind_kph > 0 ? '+' : ''}${data.diff.wind_kph})
    `);
-    console.log(JSON.stringify(data));
+
+    console.log("JSON file:\n",JSON.stringify(data));
 }
 
 const yesterdayDate = getYesterdayDate(); 
 const prompt = require('prompt-sync')();
-const userInput = prompt('   Get weather data for: '); 
+const userInput = prompt('Get weather data for: '); 
 main(userInput,yesterdayDate); 
+
+
